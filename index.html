@@ -50,23 +50,23 @@
             align-items: center;
             font-size: 4em;
             cursor: pointer;
-            transition: background-color 0.3s, transform 0.3s, left 0.5s ease-in-out, top 0.5s ease-in-out, z-index 0.01s, opacity 0.4s ease-in-out; /* Opacity-Transition angepasst */
+            transition: background-color 0.3s, transform 0.3s, left 0.5s ease-in-out, top 0.5s ease-in-out, z-index 0.01s, opacity 0.4s ease-in-out; 
             position: absolute;
             overflow: hidden;
             box-sizing: border-box;
             z-index: 2;
-            opacity: 0; /* Standardmäßig unsichtbar beim Erstellen */
+            opacity: 0; 
         }
         .card.visible {
-            opacity: 1; /* Klasse zum Sichtbar-Machen */
+            opacity: 1; 
         }
         .card.revealed {
-            background-color: #d4edda; /* Light green for correctly revealed cards */
-            cursor: default; /* Not clickable anymore */
+            background-color: #d4edda; 
+            cursor: default; 
         }
         .card.incorrect {
-            background-color: #f8d7da; /* Light red for incorrectly revealed cards */
-            cursor: default; /* Not clickable anymore */
+            background-color: #f8d7da; 
+            cursor: default; 
         }
         .card img {
             max-width: 90%;
@@ -106,7 +106,7 @@
         .message {
             font-size: 1.2em;
             margin-top: 10px;
-            min-height: 2.5em; /* Feste Mindesthöhe für die Nachricht */
+            min-height: 2.5em; 
             display: flex;
             align-items: center;
             justify-content: center;
@@ -266,28 +266,38 @@
             
             const gridPositions = getGridCellPositions();
             
-            const originalPos1 = card1Data.currentGridIndex;
-            const originalPos2 = card2Data.currentGridIndex;
+            // Speichern der visuellen Startpositionen für die Animation
+            const visualStartPos1Left = card1Data.element.style.left;
+            const visualStartPos1Top = card1Data.element.style.top;
+            const visualStartPos2Left = card2Data.element.style.left;
+            const visualStartPos2Top = card2Data.element.style.top;
+
 
             card1Data.element.style.zIndex = 100;
             card2Data.element.style.zIndex = 100;
 
-            card1Data.element.style.left = `${gridPositions[originalPos2].left}px`;
-            card1Data.element.style.top = `${gridPositions[originalPos2].top}px`;
-            card2Data.element.style.left = `${gridPositions[originalPos1].left}px`;
-            card2Data.element.style.top = `${gridPositions[originalPos1].top}px`;
+            // Karten bewegen sich zu ihren neuen Zielpositionen (visuell)
+            // Hier wird die visuelle Position vertauscht, basierend auf den aktuellen Grid-Indizes
+            card1Data.element.style.left = `${gridPositions[card2Data.currentGridIndex].left}px`;
+            card1Data.element.style.top = `${gridPositions[card2Data.currentGridIndex].top}px`;
+            card2Data.element.style.left = `${gridPositions[card1Data.currentGridIndex].left}px`;
+            card2Data.element.style.top = `${gridPositions[card1Data.currentGridIndex].top}px`;
 
-            await new Promise(resolve => setTimeout(resolve, 600));
+            await new Promise(resolve => setTimeout(resolve, 600)); // Warte, bis Animation beendet ist
 
             card1Data.element.style.zIndex = 2;
             card2Data.element.style.zIndex = 2;
 
+            // Tausche die currentGridIndex-Werte der cardData-Objekte
             const tempGridIndex = card1Data.currentGridIndex;
             card1Data.currentGridIndex = card2Data.currentGridIndex;
             card2Data.currentGridIndex = tempGridIndex;
 
+            // Nach dem Tausch der logischen Indizes, stellen wir sicher, dass die visuellen Positionen
+            // der DOM-Elemente auch dem NEUEN currentGridIndex entsprechen.
+            // Dies ist wichtig, damit die Karten bei zukünftigen Animationen von der korrekten neuen Position starten.
             card1Data.element.style.left = `${gridPositions[card1Data.currentGridIndex].left}px`;
-            card1Data.element.style.top = `${gridPositions[card2Data.currentGridIndex].top}px`; /* Korrigiert */
+            card1Data.element.style.top = `${gridPositions[card1Data.currentGridIndex].top}px`; // <-- DIESE ZEILE WURDE KORRIGIERT
             card2Data.element.style.left = `${gridPositions[card2Data.currentGridIndex].left}px`;
             card2Data.element.style.top = `${gridPositions[card2Data.currentGridIndex].top}px`;
             
@@ -367,7 +377,7 @@
                 startButton.disabled = true;
 
                 await hideAllCards(); 
-                await new Promise(resolve => setTimeout(resolve, 800)); // Längere Pause vor dem Tausch
+                await new Promise(resolve => setTimeout(resolve, 800)); 
 
                 await animateSwapTwoCards(); 
                 messageDisplay.textContent = 'Zwei Karten wurden vertauscht.';
@@ -380,13 +390,13 @@
                 messageDisplay.textContent = 'Neue Karten werden geladen...';
                 startButton.disabled = true; 
 
-                await new Promise(resolve => setTimeout(resolve, 300)); // Kurze Pause für den "Verschwinden"-Effekt
+                await new Promise(resolve => setTimeout(resolve, 300)); 
 
                 for (const cardData of cardsData) {
                     cardData.element.classList.add('visible'); 
                 }
                 
-                await new Promise(resolve => setTimeout(resolve, 800)); // Warte, bis die Karten eingeblendet sind
+                await new Promise(resolve => setTimeout(resolve, 800)); 
 
                 messageDisplay.textContent = 'Merke dir die Bilder!';
                 startButton.disabled = false; 
