@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kleines Memospiel</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+            overflow: hidden; /* Verhindert Scrollbalken bei Animationen */
+        }
+        .game-container {
+            border: 2px solid #333;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            position: relative; /* Für absolute Positionierung der Karten */
+        }
+        .cards-grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            gap: 15px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            position: relative;
+            width: fit-content;
+            height: fit-content;
+        }
+        .grid-placeholder {
+            width: 100px;
+            height: 100px;
+        }
+        .card {
+            width: 100px;
+            height: 100px;
+            background-color: #eee;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 4em;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.3s, left 0.5s ease-in-out, top 0.5s ease-in-out, z-index 0.01s, opacity 0.4s ease-in-out; /* Opacity-Transition angepasst */
+            position: absolute;
+            overflow: hidden;
+            box-sizing: border-box;
+            z-index: 2;
+            opacity: 0; /* Standardmäßig unsichtbar beim Erstellen */
+        }
+        .card.visible {
+            opacity: 1; /* Klasse zum Sichtbar-Machen */
+        }
+        .card.revealed {
+            background-color: #d4edda; /* Light green for correctly revealed cards */
+            cursor: default; /* Not clickable anymore */
+        }
+        .card.incorrect {
+            background-color: #f8d7da; /* Light red for incorrectly revealed cards */
+            cursor: default; /* Not clickable anymore */
+        }
+        .card img {
+            max-width: 90%;
+            max-height: 90%;
+            display: none;
+        }
+        .card.faced-up img, .card.temp-revealed img {
+            display: block;
+        }
+        .card.faced-down {
+            background-color: #6a0572;
+            color: #fff;
+        }
+        .card.faced-down::before {
+            content: '?';
+            font-size: 3em;
+            color: #fff;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 1em;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .message {
+            font-size: 1.2em;
+            margin-top: 10px;
+            min-height: 2.5em; /* Feste Mindesthöhe für die Nachricht */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .score {
+            margin-top: 15px;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Kleines Memospiel</h1>
+        <div class="message" id="message">Merke dir die Bilder!</div>
+        <div class="cards-grid-container" id="cards-grid-container">
+            </div>
+
+        <button id="startButton">Karten umdrehen</button>
+        <div class="score">
+            Deine Punkte: <span id="playerScore">0</span> | Computerpunkte: <span id="computerScore">0</span>
+        </div>
+    </div>
+
+    <script>
+        const cardImages = [
+            '🚗', '🍎', '🏠', '🌻', '💡', '📚'
+        ];
+        let cardsData = []; 
+        let playerPoints = 0;
+        let computerPoints = 0;
+        let gameStarted = false; 
+        let currentQuestionImage = null;
+        let isAnimating = false; 
+
+        const cardsGridContainer = document.getElementById('cards-grid-container');
+        const startButton = document.getElementById('startButton');
+        const messageDisplay = document.getElementById('message');
+        const playerScoreDisplay = document.getElementById('playerScore');
+        const computerScoreDisplay = document.getElementById('computerScore');
+
+        function getGridCellPositions() {
+            const positions = [];
+            const gridPlaceholders = cardsGridContainer.querySelectorAll('.grid-placeholder');
+            gridPlaceholders.forEach(placeholder => {
+                const rect = placeholder.getBoundingClientRect();
+                const containerRect = cardsGridContainer.getBoundingClientRect();
+                positions.push({
+                    left: rect.left - containerRect.left,
+                    top: rect.top - containerRect.top
+                });
+            });
+            return positions;
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function initializeGame() {
+            cardsData = [];
+            playerPoints = 0;
+            computerPoints = 0;
+            gameStarted = false; 
+            currentQuestionImage = null;
+            isAnimating = false;
+
+            playerScoreDisplay.textContent = playerPoints;
+            computerScoreDisplay.textContent = computerPoints;
+            messageDisplay.textContent = 'Merke dir die Bilder!';
+            startButton.textContent = 'Karten umdrehen'; 
+            startButton.disabled = false; 
+
+            cardsGridContainer.innerHTML = ''; 
+            
+            for(let i = 0; i < cardImages.length; i++) {
+                const placeholder = document.createElement('div');
+                placeholder.classList.add('grid-placeholder');
+                cardsGridContainer.appendChild(placeholder);
+            }
+            
+            const gridPositions = getGridCellPositions();
+
+            const shuffledImages = [...cardImages]; 
+            shuffleArray(shuffledImages);
+
+            shuffledImages.forEach((image, index) => { 
+                const cardEl = document.createElement('div');
+                cardEl.classList.add('card', 'faced-up'); 
+                
+                const imgSpan = document.createElement('span');
+                imgSpan.textContent = image; 
+                cardEl.appendChild(imgSpan);
+                cardsGridContainer.appendChild(cardEl);
+
+                cardEl.style.left = `${gridPositions[index].left}px`;
+                cardEl.style.top = `${gridPositions[index].top}px`;
+                cardEl.style.zIndex = 2;
+
+                cardsData.push({
+                    element: cardEl,
+                    image: image, 
+                    currentGridIndex: index 
+                });
+            });
+
+            cardsData.forEach(cardData => {
+                cardData.element.onclick = null;
+                cardData.element.style.cursor = 'default';
+            });
+        }
+
+        async function hideAllCards() {
+            for (const cardData of cardsData) {
+                if (!cardData.element.classList.contains('revealed') && !cardData.element.classList.contains('incorrect')) {
+                    cardData.element.classList.remove('faced-up');
+                    cardData.element.classList.add('faced-down');
+                    cardData.element.querySelector('span').style.display = 'none';
+                }
+            }
+        }
+
+        async function animateSwapTwoCards() {
+            isAnimating = true;
+            startButton.disabled = true;
+            messageDisplay.textContent = 'Karten werden vertauscht...';
+
+            const availableCardsForSwap = cardsData.filter(card => 
+                !card.element.classList.contains('revealed') && !card.element.classList.contains('incorrect')
+            );
+
+            if (availableCardsForSwap.length < 2) {
+                messageDisplay.textContent = 'Nicht genug unaufgedeckte Karten zum Tauschen gefunden.';
+                isAnimating = false;
+                startButton.disabled = false;
+                return;
+            }
+
+            let card1Data = availableCardsForSwap[Math.floor(Math.random() * availableCardsForSwap.length)];
+            let card2Data = availableCardsForSwap[Math.floor(Math.random() * availableCardsForSwap.length)];
+
+            let attempts = 0;
+            const MAX_SWAP_ATTEMPTS = 50; 
+            while (card1Data === card2Data && attempts < MAX_SWAP_ATTEMPTS) {
+                card2Data = availableCardsForSwap[Math.floor(Math.random() * availableCardsForSwap.length)];
+                attempts++;
+            }
+            if (card1Data === card2Data) { 
+                messageDisplay.textContent = 'Nicht genügend *verschiedene* unaufgedeckte Karten zum Tauschen.';
+                isAnimating = false;
+                startButton.disabled = false;
+                return;
+            }
+            
+            const gridPositions = getGridCellPositions();
+            
+            const originalPos1 = card1Data.currentGridIndex;
+            const originalPos2 = card2Data.currentGridIndex;
+
+            card1Data.element.style.zIndex = 100;
+            card2Data.element.style.zIndex = 100;
+
+            card1Data.element.style.left = `${gridPositions[originalPos2].left}px`;
+            card1Data.element.style.top = `${gridPositions[originalPos2].top}px`;
+            card2Data.element.style.left = `${gridPositions[originalPos1].left}px`;
+            card2Data.element.style.top = `${gridPositions[originalPos1].top}px`;
+
+            await new Promise(resolve => setTimeout(resolve, 600));
+
+            card1Data.element.style.zIndex = 2;
+            card2Data.element.style.zIndex = 2;
+
+            const tempGridIndex = card1Data.currentGridIndex;
+            card1Data.currentGridIndex = card2Data.currentGridIndex;
+            card2Data.currentGridIndex = tempGridIndex;
+
+            card1Data.element.style.left = `${gridPositions[card1Data.currentGridIndex].left}px`;
+            card1Data.element.style.top = `${gridPositions[card2Data.currentGridIndex].top}px`; /* Korrigiert */
+            card2Data.element.style.left = `${gridPositions[card2Data.currentGridIndex].left}px`;
+            card2Data.element.style.top = `${gridPositions[card2Data.currentGridIndex].top}px`;
+            
+            isAnimating = false;
+        }
+
+        function askQuestion() {
+            const hiddenCards = cardsData
+                .filter(card => !card.element.classList.contains('revealed') && !card.element.classList.contains('incorrect'));
+
+            if (hiddenCards.length === 0) {
+                messageDisplay.textContent = 'Glückwunsch! Du hast alle Karten gefunden!';
+                startButton.textContent = 'Neues Spiel starten'; 
+                startButton.disabled = false; 
+                gameStarted = false; 
+                return;
+            }
+
+            const cardToAskAbout = hiddenCards[Math.floor(Math.random() * hiddenCards.length)];
+            currentQuestionImage = cardToAskAbout.image; 
+            messageDisplay.textContent = `Wo ist das ${currentQuestionImage}?`;
+
+            cardsData.forEach(cardData => {
+                if (!cardData.element.classList.contains('revealed') && !cardData.element.classList.contains('incorrect')) {
+                    cardData.element.onclick = handleCardClick;
+                    cardData.element.style.cursor = 'pointer'; 
+                } else {
+                    cardData.element.onclick = null; 
+                    cardData.element.style.cursor = 'default'; 
+                }
+            });
+        }
+
+        async function handleCardClick(event) {
+            if (!gameStarted || currentQuestionImage === null || isAnimating) return;
+
+            isAnimating = true; 
+
+            const clickedCardElement = event.currentTarget;
+            const clickedCardData = cardsData.find(card => card.element === clickedCardElement);
+
+            if (clickedCardElement.classList.contains('revealed') || clickedCardElement.classList.contains('incorrect')) {
+                isAnimating = false; 
+                return;
+            }
+
+            cardsData.forEach(cardData => cardData.element.onclick = null);
+
+            clickedCardElement.querySelector('span').style.display = 'block';
+            clickedCardElement.classList.remove('faced-down');
+            clickedCardElement.classList.add('temp-revealed'); 
+
+            if (clickedCardData.image === currentQuestionImage) { 
+                playerPoints++;
+                playerScoreDisplay.textContent = playerPoints;
+                messageDisplay.textContent = 'Richtig! Du hast einen Punkt bekommen.';
+                clickedCardElement.classList.remove('temp-revealed');
+                clickedCardElement.classList.add('revealed'); 
+            } else {
+                computerPoints++;
+                computerScoreDisplay.textContent = computerPoints;
+                messageDisplay.textContent = 'Leider falsch! Der Computer bekommt den Punkt.';
+                clickedCardElement.classList.remove('temp-revealed');
+                clickedCardElement.classList.add('incorrect'); 
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 2000)); 
+
+            isAnimating = false; 
+
+            askQuestion();
+        }
+
+        startButton.addEventListener('click', async () => {
+            if (startButton.textContent === 'Karten umdrehen') {
+                messageDisplay.textContent = 'Karten werden verdeckt...';
+                startButton.disabled = true;
+
+                await hideAllCards(); 
+                await new Promise(resolve => setTimeout(resolve, 800)); // Längere Pause vor dem Tausch
+
+                await animateSwapTwoCards(); 
+                messageDisplay.textContent = 'Zwei Karten wurden vertauscht.';
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                gameStarted = true; 
+                askQuestion(); 
+            } else if (startButton.textContent === 'Neues Spiel starten') { 
+                initializeGame(); 
+                messageDisplay.textContent = 'Neue Karten werden geladen...';
+                startButton.disabled = true; 
+
+                await new Promise(resolve => setTimeout(resolve, 300)); // Kurze Pause für den "Verschwinden"-Effekt
+
+                for (const cardData of cardsData) {
+                    cardData.element.classList.add('visible'); 
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 800)); // Warte, bis die Karten eingeblendet sind
+
+                messageDisplay.textContent = 'Merke dir die Bilder!';
+                startButton.disabled = false; 
+            }
+        });
+
+        window.addEventListener('load', () => {
+            initializeGame();
+            for (const cardData of cardsData) {
+                cardData.element.classList.add('visible');
+            }
+        });
+    </script>
+</body>
+</html>
